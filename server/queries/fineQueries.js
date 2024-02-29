@@ -1,0 +1,68 @@
+const updateFine = {
+  updateFine1: `    
+    INSERT OR IGNORE INTO FINES (LOAN_ID, PAID, FINE_AMT)
+    SELECT LOAN_ID, 0, (round(julianday('now') - julianday(DUE_DATE)))*0.25
+    FROM BOOK_LOANS 
+    WHERE julianday('now') > julianday(DUE_DATE) AND DATE_IN IS NULL;
+  `,
+  
+  updateFine2: `
+    UPDATE FINES 
+    SET FINE_AMT = (
+        SELECT (round(julianday('now') - julianday(DUE_DATE)))*0.25
+        FROM BOOK_LOANS 
+        WHERE BOOK_LOANS.LOAN_ID = FINES.LOAN_ID AND BOOK_LOANS.DATE_IN IS NULL
+    )
+    WHERE PAID = 0 AND LOAN_ID IN (
+        SELECT LOAN_ID FROM BOOK_LOANS WHERE DATE_IN IS NULL
+    );
+  `,
+
+  updateFine3: `
+    INSERT OR IGNORE INTO FINES (LOAN_ID, PAID, FINE_AMT)
+    SELECT LOAN_ID, 0, (round(julianday(DATE_IN) - julianday(DUE_DATE)))*0.25
+    FROM BOOK_LOANS 
+    WHERE julianday(DATE_IN) > julianday(DUE_DATE) AND DATE_IN IS NOT NULL;
+  `,
+
+  updateFine4: `
+    UPDATE FINES 
+    SET FINE_AMT = (
+        SELECT (round(julianday(DATE_IN) - julianday(DUE_DATE)))*0.25
+        FROM BOOK_LOANS 
+        WHERE BOOK_LOANS.LOAN_ID = FINES.LOAN_ID AND BOOK_LOANS.DATE_IN IS NOT NULL
+    )
+    WHERE PAID = 0 AND LOAN_ID IN (
+        SELECT LOAN_ID FROM BOOK_LOANS WHERE DATE_IN IS NOT NULL
+    );
+  `,
+
+  displayCurrentFine: `
+    SELECT BOOK_LOANS.CARD_ID, PAID, SUM(FINES.FINE_AMT) AS TotalFine
+    FROM FINES
+    JOIN BOOK_LOANS ON FINES.LOAN_ID = BOOK_LOANS.LOAN_ID
+    WHERE BOOK_LOANS.DATE_IN IS NOT NULL AND FINES.PAID = 0
+    GROUP BY BOOK_LOANS.CARD_ID;
+`,
+
+  displayAllFine: `    
+    SELECT BORROWER.CARD_ID, PAID, SUM(FINES.FINE_AMT) AS TotalFine
+    FROM BORROWER
+    JOIN BOOK_LOANS ON BORROWER.CARD_ID = BOOK_LOANS.CARD_ID
+    JOIN FINES ON BOOK_LOANS.LOAN_ID = FINES.LOAN_ID
+    WHERE BOOK_LOANS.DATE_IN IS NOT NULL
+    GROUP BY BORROWER.CARD_ID;
+  `,
+  
+  payFine: `
+    UPDATE FINES
+    SET PAID = 1
+    WHERE LOAN_ID IN (
+      SELECT LOAN_ID
+      FROM BOOK_LOANS
+      WHERE BOOK_LOANS.CARD_ID = ? AND BOOK_LOANS.DATE_IN IS NOT NULL
+    );
+  `,
+};
+
+module.exports = updateFine;
